@@ -4,6 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { useConsumed } from '../contexts/ConsumedContext';
 import { useFavorites } from '../contexts/FavoritesContext';
@@ -27,6 +28,8 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 const MainTabsNavigator: React.FC = () => {
   const { favorites } = useFavorites();
   const { consumedItems } = useConsumed();
+  const insets = useSafeAreaInsets();
+  const bottomInset = Math.max(insets.bottom, 10);
 
   return (
     <Tab.Navigator
@@ -36,15 +39,25 @@ const MainTabsNavigator: React.FC = () => {
         headerTitleStyle: { fontWeight: '700' },
         tabBarActiveTintColor: COLORS.primary,
         tabBarInactiveTintColor: COLORS.textMuted,
+        tabBarLabelPosition: 'below-icon',
         tabBarStyle: {
-          minHeight: 60,
-          paddingBottom: 6,
+          height: 66 + bottomInset,
           paddingTop: 6,
+          paddingBottom: bottomInset,
+          backgroundColor: COLORS.surface,
+          borderTopWidth: 1,
+          borderTopColor: COLORS.border,
         },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '600',
-        },
+        tabBarLabel: ({ focused, color, children }) => (
+          <Text
+            style={[
+              styles.tabLabelText,
+              { color, fontWeight: focused ? '700' : '600' },
+            ]}
+          >
+            {children}
+          </Text>
+        ),
       }}
     >
       <Tab.Screen
@@ -53,8 +66,8 @@ const MainTabsNavigator: React.FC = () => {
         options={{
           title: 'Pokédex',
           tabBarAccessibilityLabel: 'Aba Catálogo Principal Pokédex',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="grid-outline" size={size} color={color} />
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="grid-outline" size={22} color={color} />
           ),
         }}
       />
@@ -64,8 +77,8 @@ const MainTabsNavigator: React.FC = () => {
         options={{
           title: 'Buscar',
           tabBarAccessibilityLabel: 'Aba Buscar Pokémon',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="search-outline" size={size} color={color} />
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="search-outline" size={22} color={color} />
           ),
         }}
       />
@@ -76,8 +89,8 @@ const MainTabsNavigator: React.FC = () => {
           title: 'Favoritos',
           tabBarBadge: favorites.length > 0 ? favorites.length : undefined,
           tabBarAccessibilityLabel: `Aba Favoritos. ${favorites.length} itens`,
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="heart-outline" size={size} color={color} />
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="heart-outline" size={22} color={color} />
           ),
         }}
       />
@@ -88,8 +101,8 @@ const MainTabsNavigator: React.FC = () => {
           title: 'Capturados',
           tabBarBadge: consumedItems.length > 0 ? consumedItems.length : undefined,
           tabBarAccessibilityLabel: `Aba Capturados e Avaliados. ${consumedItems.length} itens`,
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="trophy-outline" size={size} color={color} />
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="trophy-outline" size={22} color={color} />
           ),
         }}
       />
@@ -158,6 +171,13 @@ export const AppNavigator: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  tabLabelText: {
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: 'center',
+    includeFontPadding: true,
+    marginTop: 2,
+  },
   splashContainer: {
     flex: 1,
     alignItems: 'center',
