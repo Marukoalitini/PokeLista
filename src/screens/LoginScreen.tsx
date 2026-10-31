@@ -62,7 +62,7 @@ export const LoginScreen: React.FC = () => {
             <Ionicons name="planet" size={44} color={COLORS.white} />
           </View>
           <Text style={styles.appTitle} accessibilityRole="header">
-            PokéLista 2.0
+            PokéLista
           </Text>
           <Text style={styles.appSubtitle}>
             Catálogo Interativo de Pokémon com Favoritos e Avaliações

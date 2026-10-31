@@ -162,7 +162,7 @@ export const AppNavigator: React.FC = () => {
           <AuthStack.Screen
             name="Login"
             component={LoginScreen}
-            options={{ title: 'Autenticação — PokéLista 2.0' }}
+            options={{ title: 'Autenticação — PokéLista' }}
           />
         </AuthStack.Navigator>
       )}
