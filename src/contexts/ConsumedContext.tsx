@@ -20,8 +20,11 @@ export const ConsumedProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const { user } = useAuth();
   const [consumedItems, setConsumedItems] = useState<ConsumedPokemon[]>([]);
-  const [isHydratingConsumed, setIsHydratingConsumed] = useState<boolean>(true);
+  const [hydratedUserId, setHydratedUserId] = useState<string | null>(null);
   const [storageError, setStorageError] = useState<string | null>(null);
+
+  // Synchronously true whenever a user is present but their data has not finished hydrating yet
+  const isHydratingConsumed = Boolean(user && hydratedUserId !== user.id);
 
   // Hydrates persisted consumed items on startup
   useEffect(() => {
@@ -32,15 +35,16 @@ export const ConsumedProvider: React.FC<{ children: React.ReactNode }> = ({
         if (isMounted) {
           setConsumedItems([]);
           setStorageError(null);
-          setIsHydratingConsumed(false);
+          setHydratedUserId(null);
         }
         return;
       }
 
-      setIsHydratingConsumed(true);
+      const targetUserId = user.id;
       setStorageError(null);
+
       try {
-        const storedConsumed = await loadConsumedFromStorage(user.id);
+        const storedConsumed = await loadConsumedFromStorage(targetUserId);
         if (isMounted) {
           setConsumedItems(storedConsumed);
         }
@@ -50,7 +54,7 @@ export const ConsumedProvider: React.FC<{ children: React.ReactNode }> = ({
         }
       } finally {
         if (isMounted) {
-          setIsHydratingConsumed(false);
+          setHydratedUserId(targetUserId);
         }
       }
     }

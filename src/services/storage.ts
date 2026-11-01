@@ -119,11 +119,7 @@ export async function loadFavoritesFromStorage(userId: string): Promise<PokemonL
   if (!raw) {
     return [];
   }
-  try {
-    return JSON.parse(raw) as PokemonListItem[];
-  } catch {
-    return [];
-  }
+  return JSON.parse(raw) as PokemonListItem[];
 }
 
 export async function saveFavoritesToStorage(
@@ -138,11 +134,7 @@ export async function loadConsumedFromStorage(userId: string): Promise<ConsumedP
   if (!raw) {
     return [];
   }
-  try {
-    return JSON.parse(raw) as ConsumedPokemon[];
-  } catch {
-    return [];
-  }
+  return JSON.parse(raw) as ConsumedPokemon[];
 }
 
 export async function saveConsumedToStorage(

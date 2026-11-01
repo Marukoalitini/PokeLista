@@ -28,6 +28,7 @@ interface GraphQLPokemonSearchResult {
       name: string;
     }>;
   };
+  errors?: Array<{ message: string }>;
 }
 
 // Extracts Pokemon ID from resource URL
@@ -134,7 +135,7 @@ export async function fetchPokemonDetails(id: number): Promise<PokemonDetails> {
   };
 }
 
-// Queries the PokeAPI endpoints directly with the search term
+// Queries the PokeAPI search endpoints directly with the search term and propagates network errors
 export async function searchPokemon(query: string): Promise<PokemonListItem[]> {
   const normalizedQuery = query.trim().toLowerCase().replace(/^#/, '');
   if (!normalizedQuery) {
@@ -144,10 +145,11 @@ export async function searchPokemon(query: string): Promise<PokemonListItem[]> {
   const numericId = Number(normalizedQuery);
   const isNumericSearch = !Number.isNaN(numericId) && numericId > 0;
 
-  // 1. Direct REST endpoint call with the exact search term (/pokemon/{query})
   if (isNumericSearch) {
     try {
-      const exactResponse = await apiClient.get(`/pokemon/${encodeURIComponent(String(numericId))}`);
+      const exactResponse = await apiClient.get(
+        `/pokemon/${encodeURIComponent(String(numericId))}`
+      );
       const exactData = exactResponse.data;
       return [
         {
@@ -167,60 +169,39 @@ export async function searchPokemon(query: string): Promise<PokemonListItem[]> {
     }
   }
 
-  // 2. Server-side search by name pattern on PokeAPI GraphQL endpoint + REST exact fallback
-  try {
-    const graphqlResponse = await axios.post<GraphQLPokemonSearchResult>(
-      GRAPHQL_SEARCH_URL,
-      {
-        query: `
-          query SearchPokemonByName($pattern: String!) {
-            pokemon_v2_pokemon(
-              where: { name: { _ilike: $pattern }, is_default: { _eq: true } }
-              order_by: { id: asc }
-            ) {
-              id
-              name
-            }
+  const graphqlResponse = await axios.post<GraphQLPokemonSearchResult>(
+    GRAPHQL_SEARCH_URL,
+    {
+      query: `
+        query SearchPokemonByName($pattern: String!) {
+          pokemon_v2_pokemon(
+            where: { name: { _ilike: $pattern }, is_default: { _eq: true } }
+            order_by: { id: asc }
+          ) {
+            id
+            name
           }
-        `,
-        variables: {
-          pattern: `%${normalizedQuery}%`,
-        },
+        }
+      `,
+      variables: {
+        pattern: `%${normalizedQuery}%`,
       },
-      { timeout: 10000 }
-    );
+    },
+    { timeout: 10000 }
+  );
 
-    const matchedList = graphqlResponse.data?.data?.pokemon_v2_pokemon;
-    if (Array.isArray(matchedList)) {
-      return matchedList.map((entry) => ({
-        id: entry.id,
-        name: capitalizeName(entry.name),
-        imageUrl: getOfficialArtworkUrl(entry.id),
-      }));
-    }
-  } catch {
-    // Fallback to REST endpoint with the search term if GraphQL endpoint is unavailable
+  if (graphqlResponse.data?.errors?.length) {
+    throw new Error(graphqlResponse.data.errors[0].message);
   }
 
-  try {
-    const restResponse = await apiClient.get(
-      `/pokemon/${encodeURIComponent(normalizedQuery)}`
-    );
-    const data = restResponse.data;
-    return [
-      {
-        id: data.id,
-        name: capitalizeName(data.name),
-        imageUrl:
-          data.sprites?.other?.['official-artwork']?.front_default ||
-          data.sprites?.front_default ||
-          getOfficialArtworkUrl(data.id),
-      },
-    ];
-  } catch (err) {
-    if (axios.isAxiosError(err) && err.response?.status === 404) {
-      return [];
-    }
-    throw err;
+  const matchedList = graphqlResponse.data?.data?.pokemon_v2_pokemon;
+  if (!Array.isArray(matchedList)) {
+    throw new Error('Invalid search response from server.');
   }
+
+  return matchedList.map((entry) => ({
+    id: entry.id,
+    name: capitalizeName(entry.name),
+    imageUrl: getOfficialArtworkUrl(entry.id),
+  }));
 }

@@ -19,8 +19,11 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const { user } = useAuth();
   const [favorites, setFavorites] = useState<PokemonListItem[]>([]);
-  const [isHydratingFavorites, setIsHydratingFavorites] = useState<boolean>(true);
+  const [hydratedUserId, setHydratedUserId] = useState<string | null>(null);
   const [storageError, setStorageError] = useState<string | null>(null);
+
+  // Synchronously true whenever a user is present but their data has not finished hydrating yet
+  const isHydratingFavorites = Boolean(user && hydratedUserId !== user.id);
 
   // Hydrates persisted favorites when user session is active
   useEffect(() => {
@@ -31,15 +34,16 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({
         if (isMounted) {
           setFavorites([]);
           setStorageError(null);
-          setIsHydratingFavorites(false);
+          setHydratedUserId(null);
         }
         return;
       }
 
-      setIsHydratingFavorites(true);
+      const targetUserId = user.id;
       setStorageError(null);
+
       try {
-        const storedFavorites = await loadFavoritesFromStorage(user.id);
+        const storedFavorites = await loadFavoritesFromStorage(targetUserId);
         if (isMounted) {
           setFavorites(storedFavorites);
         }
@@ -49,7 +53,7 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({
         }
       } finally {
         if (isMounted) {
-          setIsHydratingFavorites(false);
+          setHydratedUserId(targetUserId);
         }
       }
     }
