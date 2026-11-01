@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { Alert } from 'react-native';
 import { loadFavoritesFromStorage, saveFavoritesToStorage } from '../services/storage';
 import { PokemonListItem } from '../types/pokemon';
 import { useAuth } from './AuthContext';
@@ -6,6 +7,7 @@ import { useAuth } from './AuthContext';
 interface FavoritesContextData {
   favorites: PokemonListItem[];
   isHydratingFavorites: boolean;
+  storageError: string | null;
   toggleFavorite: (item: PokemonListItem) => Promise<void>;
   isFavorite: (id: number) => boolean;
 }
@@ -18,6 +20,7 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({
   const { user } = useAuth();
   const [favorites, setFavorites] = useState<PokemonListItem[]>([]);
   const [isHydratingFavorites, setIsHydratingFavorites] = useState<boolean>(true);
+  const [storageError, setStorageError] = useState<string | null>(null);
 
   // Hydrates persisted favorites when user session is active
   useEffect(() => {
@@ -27,16 +30,22 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({
       if (!user) {
         if (isMounted) {
           setFavorites([]);
+          setStorageError(null);
           setIsHydratingFavorites(false);
         }
         return;
       }
 
       setIsHydratingFavorites(true);
+      setStorageError(null);
       try {
         const storedFavorites = await loadFavoritesFromStorage(user.id);
         if (isMounted) {
           setFavorites(storedFavorites);
+        }
+      } catch {
+        if (isMounted) {
+          setStorageError('Não foi possível restaurar seus favoritos salvos.');
         }
       } finally {
         if (isMounted) {
@@ -58,17 +67,25 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({
         return;
       }
 
-      setFavorites((prev) => {
-        const exists = prev.some((fav) => fav.id === item.id);
-        const updated = exists
-          ? prev.filter((fav) => fav.id !== item.id)
-          : [item, ...prev];
+      const previousFavorites = favorites;
+      const exists = previousFavorites.some((fav) => fav.id === item.id);
+      const updatedFavorites = exists
+        ? previousFavorites.filter((fav) => fav.id !== item.id)
+        : [item, ...previousFavorites];
 
-        saveFavoritesToStorage(user.id, updated).catch(() => {});
-        return updated;
-      });
+      setFavorites(updatedFavorites);
+      setStorageError(null);
+
+      try {
+        await saveFavoritesToStorage(user.id, updatedFavorites);
+      } catch {
+        setFavorites(previousFavorites);
+        const errorMsg = 'Falha ao salvar alterações nos favoritos no armazenamento local.';
+        setStorageError(errorMsg);
+        Alert.alert('Erro de Persistência', errorMsg);
+      }
     },
-    [user]
+    [user, favorites]
   );
 
   const isFavorite = useCallback(
@@ -83,6 +100,7 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({
       value={{
         favorites,
         isHydratingFavorites,
+        storageError,
         toggleFavorite,
         isFavorite,
       }}

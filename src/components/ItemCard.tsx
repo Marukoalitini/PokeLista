@@ -36,10 +36,14 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, onPress }) => {
           consumedInfo
             ? ` Capturado com nota ${consumedInfo.rating} de 5 estrelas.`
             : ''
-        } Toque para abrir detalhes.`}
+        }`}
+        accessibilityHint="Toque duas vezes para abrir a tela de detalhes deste Pokémon"
+        accessibilityState={{ selected: favorite }}
       >
         <View style={styles.cardHeader}>
-          <Text style={styles.idText}>{formattedId}</Text>
+          <Text style={styles.idText} allowFontScaling={true}>
+            {formattedId}
+          </Text>
 
           <Pressable
             onPress={() => toggleFavorite(item)}
@@ -52,6 +56,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, onPress }) => {
                 ? `Remover ${item.name} dos favoritos`
                 : `Adicionar ${item.name} aos favoritos`
             }
+            accessibilityHint="Alterna o estado de favorito deste Pokémon"
             accessibilityState={{ selected: favorite }}
           >
             <Ionicons
@@ -71,7 +76,9 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, onPress }) => {
               accessibilityLabel={`Imagem indisponível para ${item.name}`}
             >
               <Ionicons name="image-outline" size={40} color={COLORS.textMuted} />
-              <Text style={styles.placeholderText}>Sem imagem</Text>
+              <Text style={styles.placeholderText} allowFontScaling={true}>
+                Sem imagem
+              </Text>
             </View>
           ) : (
             <Image
@@ -86,14 +93,18 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, onPress }) => {
           )}
         </View>
 
-        <Text style={styles.nameText} numberOfLines={2}>
+        <Text style={styles.nameText} allowFontScaling={true}>
           {item.name}
         </Text>
 
         {consumedInfo ? (
-          <View style={styles.consumedBadge}>
+          <View
+            style={styles.consumedBadge}
+            accessible={true}
+            accessibilityLabel={`Capturado com nota ${consumedInfo.rating} de 5 estrelas`}
+          >
             <Ionicons name="checkmark-circle" size={14} color={COLORS.success} />
-            <Text style={styles.consumedBadgeText}>
+            <Text style={styles.consumedBadgeText} allowFontScaling={true}>
               Capturado • {consumedInfo.rating}★
             </Text>
           </View>
@@ -130,6 +141,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    flexWrap: 'wrap',
   },
   idText: {
     fontSize: 13,
@@ -146,8 +158,8 @@ const styles = StyleSheet.create({
     marginTop: -SPACING.sm,
   },
   imageContainer: {
-    width: 100,
-    height: 100,
+    minWidth: 96,
+    minHeight: 96,
     alignItems: 'center',
     justifyContent: 'center',
     marginVertical: SPACING.xs,
@@ -157,8 +169,8 @@ const styles = StyleSheet.create({
     height: 96,
   },
   placeholderBox: {
-    width: 92,
-    height: 92,
+    minWidth: 92,
+    minHeight: 92,
     borderRadius: RADIUS.md,
     borderCurve: 'continuous',
     backgroundColor: COLORS.surfaceAlt,
@@ -182,6 +194,8 @@ const styles = StyleSheet.create({
   consumedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
     backgroundColor: COLORS.successBackground,
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.xs,

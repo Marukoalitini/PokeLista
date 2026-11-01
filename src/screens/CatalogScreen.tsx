@@ -18,6 +18,7 @@ import { useFavorites } from '../contexts/FavoritesContext';
 import { fetchPokemonPage } from '../services/api';
 import { AppStackParamList, MainTabParamList } from '../types/navigation';
 import { PokemonListItem } from '../types/pokemon';
+import { getErrorMessage } from '../utils/errorUtils';
 import { COLORS, RADIUS, SPACING } from '../utils/theme';
 
 type CatalogNavigationProp = CompositeNavigationProp<
@@ -30,7 +31,7 @@ const PAGE_LIMIT = 20;
 export const CatalogScreen: React.FC = () => {
   const navigation = useNavigation<CatalogNavigationProp>();
   const { user, signOut } = useAuth();
-  const { favorites } = useFavorites();
+  const { favorites, storageError } = useFavorites();
 
   const [items, setItems] = useState<PokemonListItem[]>([]);
   const [offset, setOffset] = useState<number>(0);
@@ -56,8 +57,13 @@ export const CatalogScreen: React.FC = () => {
       setItems(result.items);
       setOffset(PAGE_LIMIT);
       setHasMore(result.hasMore);
-    } catch {
-      setError('Não foi possível carregar o catálogo da PokéAPI.');
+    } catch (err) {
+      setError(
+        getErrorMessage(
+          err,
+          'Não foi possível atualizar o catálogo da PokéAPI.'
+        )
+      );
     } finally {
       setInitialLoading(false);
       setRefreshing(false);
@@ -86,8 +92,10 @@ export const CatalogScreen: React.FC = () => {
       });
       setOffset((prev) => prev + PAGE_LIMIT);
       setHasMore(result.hasMore);
-    } catch {
-      setPaginationError('Falha ao carregar mais Pokémon.');
+    } catch (err) {
+      setPaginationError(
+        getErrorMessage(err, 'Falha ao carregar mais Pokémon.')
+      );
     } finally {
       setLoadingMore(false);
     }
@@ -103,17 +111,23 @@ export const CatalogScreen: React.FC = () => {
   const renderFooter = () => {
     if (loadingMore) {
       return (
-        <View style={styles.footerContainer}>
+        <View style={styles.footerContainer} accessibilityLiveRegion="polite">
           <ActivityIndicator size="small" color={COLORS.primary} />
-          <Text style={styles.footerText}>Carregando mais Pokémon...</Text>
+          <Text style={styles.footerText} allowFontScaling={true}>
+            Carregando mais Pokémon...
+          </Text>
         </View>
       );
     }
 
     if (paginationError) {
       return (
-        <View style={styles.footerContainer}>
-          <Text style={styles.paginationErrorText} selectable={true}>
+        <View style={styles.footerContainer} accessibilityRole="alert">
+          <Text
+            style={styles.paginationErrorText}
+            selectable={true}
+            allowFontScaling={true}
+          >
             {paginationError}
           </Text>
           <Pressable
@@ -123,7 +137,9 @@ export const CatalogScreen: React.FC = () => {
             accessibilityRole="button"
             accessibilityLabel="Tentar novamente carregar a próxima página"
           >
-            <Text style={styles.retryMoreButtonText}>Tentar novamente</Text>
+            <Text style={styles.retryMoreButtonText} allowFontScaling={true}>
+              Tentar novamente
+            </Text>
           </Pressable>
         </View>
       );
@@ -134,9 +150,11 @@ export const CatalogScreen: React.FC = () => {
 
   if (initialLoading) {
     return (
-      <View style={styles.centered}>
+      <View style={styles.centered} accessibilityLiveRegion="polite">
         <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Carregando Pokédex...</Text>
+        <Text style={styles.loadingText} allowFontScaling={true}>
+          Carregando Pokédex...
+        </Text>
       </View>
     );
   }
@@ -149,8 +167,10 @@ export const CatalogScreen: React.FC = () => {
     <View style={styles.container}>
       <View style={styles.userBanner}>
         <View style={styles.userTextContainer}>
-          <Text style={styles.greetingText}>Olá, {user?.name || 'Treinador'}!</Text>
-          <Text style={styles.subGreetingText}>
+          <Text style={styles.greetingText} allowFontScaling={true}>
+            Olá, {user?.name || 'Treinador'}!
+          </Text>
+          <Text style={styles.subGreetingText} allowFontScaling={true}>
             Explore a Pokédex, favorite e avalie seus Pokémon
           </Text>
         </View>
@@ -165,7 +185,9 @@ export const CatalogScreen: React.FC = () => {
             accessibilityLabel={`Ir para Favoritos. ${favorites.length} itens favoritados.`}
           >
             <Ionicons name="heart" size={20} color={COLORS.favoriteActive} />
-            <Text style={styles.headerActionText}>{favorites.length}</Text>
+            <Text style={styles.headerActionText} allowFontScaling={true}>
+              {favorites.length}
+            </Text>
           </Pressable>
 
           <Pressable
@@ -177,10 +199,60 @@ export const CatalogScreen: React.FC = () => {
             accessibilityLabel="Sair da conta (Logout)"
           >
             <Ionicons name="log-out-outline" size={20} color={COLORS.textPrimary} />
-            <Text style={styles.logoutText}>Sair</Text>
+            <Text style={styles.logoutText} allowFontScaling={true}>
+              Sair
+            </Text>
           </Pressable>
         </View>
       </View>
+
+      {/* Displays non-blocking error banner with retry when refresh fails on a populated list */}
+      {error && items.length > 0 ? (
+        <View
+          style={styles.refreshErrorBanner}
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+        >
+          <View style={styles.refreshErrorTextGroup}>
+            <Ionicons name="alert-circle" size={20} color={COLORS.error} />
+            <Text
+              style={styles.refreshErrorText}
+              selectable={true}
+              allowFontScaling={true}
+            >
+              {error}
+            </Text>
+          </View>
+          <Pressable
+            style={styles.refreshRetryButton}
+            onPress={() => loadFirstPage(true)}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel="Tentar novamente atualizar a lista"
+          >
+            <Text style={styles.refreshRetryButtonText} allowFontScaling={true}>
+              Tentar novamente
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      {storageError ? (
+        <View
+          style={styles.refreshErrorBanner}
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+        >
+          <Ionicons name="warning-outline" size={20} color={COLORS.error} />
+          <Text
+            style={styles.refreshErrorText}
+            selectable={true}
+            allowFontScaling={true}
+          >
+            {storageError}
+          </Text>
+        </View>
+      ) : null}
 
       <FlatList
         data={items}
@@ -285,6 +357,46 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.textPrimary,
   },
+  refreshErrorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    backgroundColor: COLORS.errorBackground,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    gap: SPACING.sm,
+  },
+  refreshErrorTextGroup: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: 180,
+    gap: SPACING.sm,
+  },
+  refreshErrorText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.error,
+  },
+  refreshRetryButton: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.sm,
+    borderCurve: 'continuous',
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  refreshRetryButtonText: {
+    color: COLORS.white,
+    fontSize: 13,
+    fontWeight: '700',
+  },
   listContent: {
     padding: SPACING.sm,
     paddingBottom: SPACING.xxl,
@@ -303,6 +415,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.error,
     marginBottom: SPACING.sm,
+    textAlign: 'center',
   },
   retryMoreButton: {
     backgroundColor: COLORS.primary,

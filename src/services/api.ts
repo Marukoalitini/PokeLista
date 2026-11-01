@@ -3,6 +3,7 @@ import { PokemonDetails, PokemonListItem } from '../types/pokemon';
 import { capitalizeName, stripHtmlAndCleanText } from '../utils/textUtils';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://pokeapi.co/api/v2';
+const GRAPHQL_SEARCH_URL = 'https://beta.pokeapi.co/graphql/v1beta';
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,
@@ -18,6 +19,15 @@ interface PokeApiListResponse {
   count: number;
   next: string | null;
   results: PokeApiNamedResource[];
+}
+
+interface GraphQLPokemonSearchResult {
+  data?: {
+    pokemon_v2_pokemon?: Array<{
+      id: number;
+      name: string;
+    }>;
+  };
 }
 
 // Extracts Pokemon ID from resource URL
@@ -124,29 +134,93 @@ export async function fetchPokemonDetails(id: number): Promise<PokemonDetails> {
   };
 }
 
-let cachedSearchIndex: PokemonListItem[] | null = null;
-
-// Searches Pokemon by name or ID and returns a list of matches
+// Queries the PokeAPI endpoints directly with the search term
 export async function searchPokemon(query: string): Promise<PokemonListItem[]> {
   const normalizedQuery = query.trim().toLowerCase().replace(/^#/, '');
   if (!normalizedQuery) {
     return [];
   }
 
-  if (!cachedSearchIndex) {
-    const response = await apiClient.get<PokeApiListResponse>('/pokemon', {
-      params: { limit: 1025, offset: 0 },
-    });
-    cachedSearchIndex = response.data.results.map(mapResourceToListItem);
+  const numericId = Number(normalizedQuery);
+  const isNumericSearch = !Number.isNaN(numericId) && numericId > 0;
+
+  // 1. Direct REST endpoint call with the exact search term (/pokemon/{query})
+  if (isNumericSearch) {
+    try {
+      const exactResponse = await apiClient.get(`/pokemon/${encodeURIComponent(String(numericId))}`);
+      const exactData = exactResponse.data;
+      return [
+        {
+          id: exactData.id,
+          name: capitalizeName(exactData.name),
+          imageUrl:
+            exactData.sprites?.other?.['official-artwork']?.front_default ||
+            exactData.sprites?.front_default ||
+            getOfficialArtworkUrl(exactData.id),
+        },
+      ];
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 404) {
+        return [];
+      }
+      throw err;
+    }
   }
 
-  const matches = cachedSearchIndex.filter((item) => {
-    const nameMatch = item.name.toLowerCase().includes(normalizedQuery);
-    const idMatch =
-      String(item.id) === normalizedQuery ||
-      String(item.id).padStart(3, '0') === normalizedQuery;
-    return nameMatch || idMatch;
-  });
+  // 2. Server-side search by name pattern on PokeAPI GraphQL endpoint + REST exact fallback
+  try {
+    const graphqlResponse = await axios.post<GraphQLPokemonSearchResult>(
+      GRAPHQL_SEARCH_URL,
+      {
+        query: `
+          query SearchPokemonByName($pattern: String!) {
+            pokemon_v2_pokemon(
+              where: { name: { _ilike: $pattern }, is_default: { _eq: true } }
+              order_by: { id: asc }
+            ) {
+              id
+              name
+            }
+          }
+        `,
+        variables: {
+          pattern: `%${normalizedQuery}%`,
+        },
+      },
+      { timeout: 10000 }
+    );
 
-  return matches.slice(0, 40);
+    const matchedList = graphqlResponse.data?.data?.pokemon_v2_pokemon;
+    if (Array.isArray(matchedList)) {
+      return matchedList.map((entry) => ({
+        id: entry.id,
+        name: capitalizeName(entry.name),
+        imageUrl: getOfficialArtworkUrl(entry.id),
+      }));
+    }
+  } catch {
+    // Fallback to REST endpoint with the search term if GraphQL endpoint is unavailable
+  }
+
+  try {
+    const restResponse = await apiClient.get(
+      `/pokemon/${encodeURIComponent(normalizedQuery)}`
+    );
+    const data = restResponse.data;
+    return [
+      {
+        id: data.id,
+        name: capitalizeName(data.name),
+        imageUrl:
+          data.sprites?.other?.['official-artwork']?.front_default ||
+          data.sprites?.front_default ||
+          getOfficialArtworkUrl(data.id),
+      },
+    ];
+  } catch (err) {
+    if (axios.isAxiosError(err) && err.response?.status === 404) {
+      return [];
+    }
+    throw err;
+  }
 }

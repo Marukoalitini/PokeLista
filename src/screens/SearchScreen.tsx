@@ -19,6 +19,7 @@ import { ItemCard } from '../components/ItemCard';
 import { searchPokemon } from '../services/api';
 import { AppStackParamList, MainTabParamList } from '../types/navigation';
 import { PokemonListItem } from '../types/pokemon';
+import { getErrorMessage } from '../utils/errorUtils';
 import { COLORS, RADIUS, SPACING } from '../utils/theme';
 
 type SearchNavigationProp = CompositeNavigationProp<
@@ -52,8 +53,13 @@ export const SearchScreen: React.FC = () => {
     try {
       const matchedItems = await searchPokemon(trimmed);
       setResults(matchedItems);
-    } catch {
-      setError('Falha ao buscar Pokémon na API. Verifique sua conexão.');
+    } catch (err) {
+      setError(
+        getErrorMessage(
+          err,
+          'Falha ao buscar Pokémon na API. Verifique sua conexão e tente novamente.'
+        )
+      );
     } finally {
       setLoading(false);
     }

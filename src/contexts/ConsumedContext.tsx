@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { Alert } from 'react-native';
 import { loadConsumedFromStorage, saveConsumedToStorage } from '../services/storage';
 import { ConsumedPokemon, PokemonListItem, RatingValue } from '../types/pokemon';
 import { useAuth } from './AuthContext';
@@ -6,6 +7,7 @@ import { useAuth } from './AuthContext';
 interface ConsumedContextData {
   consumedItems: ConsumedPokemon[];
   isHydratingConsumed: boolean;
+  storageError: string | null;
   rateConsumedItem: (item: PokemonListItem, rating: RatingValue) => Promise<void>;
   removeConsumedItem: (id: number) => Promise<void>;
   getConsumedItem: (id: number) => ConsumedPokemon | undefined;
@@ -19,6 +21,7 @@ export const ConsumedProvider: React.FC<{ children: React.ReactNode }> = ({
   const { user } = useAuth();
   const [consumedItems, setConsumedItems] = useState<ConsumedPokemon[]>([]);
   const [isHydratingConsumed, setIsHydratingConsumed] = useState<boolean>(true);
+  const [storageError, setStorageError] = useState<string | null>(null);
 
   // Hydrates persisted consumed items on startup
   useEffect(() => {
@@ -28,16 +31,22 @@ export const ConsumedProvider: React.FC<{ children: React.ReactNode }> = ({
       if (!user) {
         if (isMounted) {
           setConsumedItems([]);
+          setStorageError(null);
           setIsHydratingConsumed(false);
         }
         return;
       }
 
       setIsHydratingConsumed(true);
+      setStorageError(null);
       try {
         const storedConsumed = await loadConsumedFromStorage(user.id);
         if (isMounted) {
           setConsumedItems(storedConsumed);
+        }
+      } catch {
+        if (isMounted) {
+          setStorageError('Não foi possível restaurar os itens capturados salvos.');
         }
       } finally {
         if (isMounted) {
@@ -59,23 +68,31 @@ export const ConsumedProvider: React.FC<{ children: React.ReactNode }> = ({
         return;
       }
 
+      const previousItems = consumedItems;
       const newRecord: ConsumedPokemon = {
         ...item,
         rating,
         consumedAt: new Date().toISOString(),
       };
 
-      setConsumedItems((prev) => {
-        const exists = prev.some((entry) => entry.id === item.id);
-        const updated = exists
-          ? prev.map((entry) => (entry.id === item.id ? newRecord : entry))
-          : [newRecord, ...prev];
+      const exists = previousItems.some((entry) => entry.id === item.id);
+      const updatedItems = exists
+        ? previousItems.map((entry) => (entry.id === item.id ? newRecord : entry))
+        : [newRecord, ...previousItems];
 
-        saveConsumedToStorage(user.id, updated).catch(() => {});
-        return updated;
-      });
+      setConsumedItems(updatedItems);
+      setStorageError(null);
+
+      try {
+        await saveConsumedToStorage(user.id, updatedItems);
+      } catch {
+        setConsumedItems(previousItems);
+        const errorMsg = 'Falha ao salvar a avaliação no armazenamento local.';
+        setStorageError(errorMsg);
+        Alert.alert('Erro de Persistência', errorMsg);
+      }
     },
-    [user]
+    [user, consumedItems]
   );
 
   const removeConsumedItem = useCallback(
@@ -84,13 +101,22 @@ export const ConsumedProvider: React.FC<{ children: React.ReactNode }> = ({
         return;
       }
 
-      setConsumedItems((prev) => {
-        const updated = prev.filter((entry) => entry.id !== id);
-        saveConsumedToStorage(user.id, updated).catch(() => {});
-        return updated;
-      });
+      const previousItems = consumedItems;
+      const updatedItems = previousItems.filter((entry) => entry.id !== id);
+
+      setConsumedItems(updatedItems);
+      setStorageError(null);
+
+      try {
+        await saveConsumedToStorage(user.id, updatedItems);
+      } catch {
+        setConsumedItems(previousItems);
+        const errorMsg = 'Falha ao remover item do armazenamento local.';
+        setStorageError(errorMsg);
+        Alert.alert('Erro de Persistência', errorMsg);
+      }
     },
-    [user]
+    [user, consumedItems]
   );
 
   const getConsumedItem = useCallback(
@@ -105,6 +131,7 @@ export const ConsumedProvider: React.FC<{ children: React.ReactNode }> = ({
       value={{
         consumedItems,
         isHydratingConsumed,
+        storageError,
         rateConsumedItem,
         removeConsumedItem,
         getConsumedItem,

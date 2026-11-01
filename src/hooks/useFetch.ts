@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { getErrorMessage } from '../utils/errorUtils';
 
 interface UseFetchResult<T> {
   data: T | null;
@@ -8,7 +9,10 @@ interface UseFetchResult<T> {
 }
 
 // Generic hook to handle loading, error, and data states explicitly
-export function useFetch<T>(fetcher: () => Promise<T>, dependencies: unknown[] = []): UseFetchResult<T> {
+export function useFetch<T>(
+  fetcher: () => Promise<T>,
+  dependencies: unknown[] = []
+): UseFetchResult<T> {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -20,11 +24,12 @@ export function useFetch<T>(fetcher: () => Promise<T>, dependencies: unknown[] =
       const result = await fetcher();
       setData(result);
     } catch (err) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : 'Não foi possível carregar os dados. Verifique sua conexão.';
-      setError(message);
+      setError(
+        getErrorMessage(
+          err,
+          'Não foi possível carregar os detalhes. Verifique sua conexão e tente novamente.'
+        )
+      );
     } finally {
       setLoading(false);
     }
@@ -43,11 +48,12 @@ export function useFetch<T>(fetcher: () => Promise<T>, dependencies: unknown[] =
         }
       } catch (err) {
         if (isMounted) {
-          const message =
-            err instanceof Error
-              ? err.message
-              : 'Não foi possível carregar os dados. Verifique sua conexão.';
-          setError(message);
+          setError(
+            getErrorMessage(
+              err,
+              'Não foi possível carregar os detalhes. Verifique sua conexão e tente novamente.'
+            )
+          );
         }
       } finally {
         if (isMounted) {

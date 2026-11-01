@@ -39,9 +39,10 @@ const MainTabsNavigator: React.FC = () => {
         headerTitleStyle: { fontWeight: '700' },
         tabBarActiveTintColor: COLORS.primary,
         tabBarInactiveTintColor: COLORS.textMuted,
+        tabBarAllowFontScaling: true,
         tabBarLabelPosition: 'below-icon',
         tabBarStyle: {
-          height: 66 + bottomInset,
+          minHeight: 66 + bottomInset,
           paddingTop: 6,
           paddingBottom: bottomInset,
           backgroundColor: COLORS.surface,
@@ -50,6 +51,7 @@ const MainTabsNavigator: React.FC = () => {
         },
         tabBarLabel: ({ focused, color, children }) => (
           <Text
+            allowFontScaling={true}
             style={[
               styles.tabLabelText,
               { color, fontWeight: focused ? '700' : '600' },
@@ -121,9 +123,17 @@ export const AppNavigator: React.FC = () => {
 
   if (isHydrating) {
     return (
-      <View style={styles.splashContainer}>
+      <View
+        style={styles.splashContainer}
+        accessible={true}
+        accessibilityRole="progressbar"
+        accessibilityLabel="Carregando seus dados salvos"
+        accessibilityLiveRegion="polite"
+      >
         <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.splashText}>Carregando seus dados salvos...</Text>
+        <Text style={styles.splashText} allowFontScaling={true}>
+          Carregando seus dados salvos...
+        </Text>
       </View>
     );
   }
